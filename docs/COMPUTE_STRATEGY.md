@@ -24,16 +24,30 @@ every upstream step and its parameters. So:
 
 ## 1. What actually needs offloading
 
-Measured on this repo's synthetic imaging data (16 features, 10 slides) on a 4-core,
-16 GB container (no GPU). See `BENCHMARKS` below for the 1,000,000-object run.
+Measured on 1,000,000 synthetic imaging objects (16 features, 10 slides) on a 4-core,
+16 GB container with no GPU (`featurescope` 0.1.0, October 2026):
 
-| Step class | Scaling | 1M objects, 4 CPU cores | Recommendation |
-|---|---|---|---|
-| Import, transform, normalize, batch centering, ComBat | O(n·p), in-memory | seconds | local |
-| PCA, k-means (mini-batch), FlowSOM, spatial kNN, cellular neighborhoods | ~O(n·p·k) | seconds to a minute | local |
-| kNN graph (pynndescent), UMAP, Leiden | O(n log n), memory-heavy | many minutes; RAM ≈ 6× the matrix | HPC CPU node (16–64 cores), or a GPU with rapids-singlecell (10–100× faster) |
-| VAE / contrastive / spatial GNN (DGI), scVI | many epochs × n | slow on CPU | GPU node |
-| Dashboard interaction (plots, lasso, gates) | display sample ≤150k points; selections over all n | <1 s per interaction at 1M | local, or run the whole dashboard on a node (Section 4) |
+| Step | Time (1M objects, 4 CPU cores) | Recommendation |
+|---|---|---|
+| Import CSV-equivalent table → project (`base.h5ad`) | 3.3 s | local |
+| arcsinh, clip, per-slide centering, z-score | 0.5–2.7 s each | local |
+| PCA (15 PCs) | 1.5 s | local |
+| k-means (mini-batch) / FlowSOM (10×10 SOM) | 2.6 s / 5.2 s | local |
+| Spatial kNN graph / cellular neighborhoods | 24.7 s / 4.8 s | local |
+| VAE, 2 epochs (CPU) | 64.6 s (~32 s per epoch) | GPU node for real training (30+ epochs) |
+| kNN graph on PCA (pynndescent) | 199.6 s | HPC CPU node, or GPU (rapids-singlecell) |
+| Leiden | 84.7 s | HPC or GPU |
+| UMAP | **1061.5 s (~18 min)** | **GPU** (rapids-singlecell UMAP is typically 1–2 orders of magnitude faster) |
+| Whole pipeline, first run | 1456 s (~24 min); peak RSS 9.1 GB | |
+| **Reopen everything from cache** | **4.4 s** | |
+| Dashboard: scatter payload (150k-point sample) | 2.8 MB, 0.03 s | local |
+| Dashboard: polygon selection over all 1M objects | 0.12 s | local |
+| Dashboard: histogram over all 1M objects | 0.05 s | local |
+
+So interaction stays fast at 1M objects on a laptop-class machine, and the time sinks are
+the kNN graph, UMAP, Leiden and deep-model training. Those steps should be offloaded.
+Memory grows roughly linearly (about 9 GB at 1M objects for this pipeline), so plan on
+about 64 GB at 5M objects and a large-memory node beyond that.
 
 The **Compute** tab estimates matrix size and RAM, and suggests a target from the
 pending steps (`featurescope.compute.recommend`).
