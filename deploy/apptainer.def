@@ -1,0 +1,16 @@
+# Apptainer/Singularity image for HPC (no root needed at run time; Docker is usually not allowed on clusters).
+#   apptainer build featurescope-gpu.sif deploy/apptainer.def      # or, from a registry:
+#   apptainer pull featurescope-gpu.sif docker://ghcr.io/cu-ibif/featurescope:gpu
+# Run with GPUs:  apptainer exec --nv featurescope-gpu.sif featurescope run <project> --pipeline <name>
+Bootstrap: docker
+From: ghcr.io/cu-ibif/featurescope:gpu
+
+%environment
+    export NUMBA_CACHE_DIR=/tmp/numba
+    export MPLCONFIGDIR=/tmp/mpl
+
+%runscript
+    exec featurescope "$@"
+
+%labels
+    org.opencontainers.image.source https://github.com/CU-IBIF/DataExplorationDashboard

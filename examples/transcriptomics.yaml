@@ -1,0 +1,16 @@
+# Count matrices (scRNA-seq, Xenium/CosMx/MERSCOPE panels). Import an .h5ad or a cells x genes table.
+name: transcriptomics
+steps:
+  - {op: normalize, params: {method: total, target_sum: 10000}}
+  - {op: transform, params: {method: log1p}}
+  - {op: highly_variable, params: {n_top: 2000, flavor: dispersion}}
+  - {op: save_layer, params: {name: lognorm}}
+  - {op: normalize, params: {method: zscore, max_value: 10}}
+  - {op: pca, params: {n_comps: 50}}
+  - {op: harmony, params: {}}
+  - {op: neighbors, params: {use_rep: X_harmony, n_neighbors: 15}}
+  - {op: umap, params: {}}
+  - {op: leiden, params: {resolution: 1.0}}
+  - {op: markers, params: {groupby: leiden, layer: lognorm}}
+  # with raw integer counts and a GPU: replace harmony with
+  # - {op: scvi, params: {n_latent: 30, layer: raw}}

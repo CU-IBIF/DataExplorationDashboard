@@ -1,0 +1,85 @@
+# Copy to ~/.featurescope/compute.yaml (personal) or <project>/compute.yaml (shared with a lab).
+# FeatureScope never stores passwords or keys: it calls ssh/rsync, kubectl, aws, gcloud,
+# which use your own SSH keys, kubeconfig and cloud SSO. Hostnames marked VERIFY must be
+# confirmed with the provider (see docs/COMPUTE_STRATEGY.md).
+profiles:
+
+  creighton-hpc:                       # Creighton DoIT research computing (VERIFY host/partitions with DoIT)
+    type: slurm
+    description: Creighton research HPC (Slurm over SSH)
+    host: hpc-login.creighton.edu      # VERIFY - placeholder
+    user: your_netid
+    remote_root: /scratch/{user}/featurescope    # VERIFY scratch path
+    partition: gpu                     # VERIFY
+    gres: gpu:1
+    cpus: 16
+    mem: 128G
+    time: "08:00:00"
+    env_setup: |
+      module load apptainer            # or: module load anaconda && conda activate featurescope
+    container: /scratch/your_netid/featurescope-gpu.sif
+
+  hcc-swan:                            # UNL Holland Computing Center (requires an HCC group/account)
+    type: slurm
+    description: HCC Swan (Slurm). 2FA via Duo - SSH ControlMaster keeps one login for 8h.
+    host: swan.unl.edu
+    user: your_hcc_username
+    remote_root: /work/your_group/{user}/featurescope
+    partition: gpu
+    gres: gpu:1
+    cpus: 16
+    mem: 120G
+    time: "08:00:00"
+    env_setup: |
+      module load apptainer
+    container: /work/your_group/your_hcc_username/featurescope-gpu.sif
+
+  hcc-swan-cpu:
+    type: slurm
+    description: HCC Swan CPU batch (large kNN/UMAP/Leiden without deep learning)
+    host: swan.unl.edu
+    user: your_hcc_username
+    remote_root: /work/your_group/{user}/featurescope
+    partition: batch
+    cpus: 32
+    mem: 250G
+    time: "12:00:00"
+    env_setup: |
+      module load apptainer
+    container: /work/your_group/your_hcc_username/featurescope-cpu.sif
+
+  nrp-nautilus:                        # National Research Platform (free for non-profit research/education)
+    type: kubernetes
+    description: NRP Nautilus GPU job; data staged via the namespace's S3 (Ceph) bucket
+    context: nautilus
+    namespace: your-lab-namespace      # created/joined at https://portal.nrp.ai
+    image: ghcr.io/cu-ibif/featurescope:gpu
+    gpus: 1
+    cpus: 8
+    memory: 64Gi
+    storage: s3://your-bucket/featurescope
+    s3_endpoint: https://s3-west.nrp-nautilus.io     # VERIFY the endpoint for your bucket's region
+    s3_secret: s3-credentials
+
+  aws-gpu:
+    type: aws_batch
+    description: AWS Batch GPU queue (g5/g6 instances)
+    region: us-east-2
+    job_queue: featurescope-gpu
+    job_definition: featurescope-gpu:1
+    storage: s3://your-lab-bucket/featurescope
+    gpus: 1
+    cpus: 8
+    memory_mib: 61440
+
+  gcp-gpu:
+    type: gcp_batch
+    description: Google Cloud Batch with one T4/L4 GPU
+    region: us-central1
+    image: us-docker.pkg.dev/your-project/featurescope/featurescope:gpu
+    storage: gs://your-lab-bucket/featurescope
+    machine_type: g2-standard-8
+    gpu_type: nvidia-l4
+    gpus: 1
+    cpus: 8
+    memory_mib: 30000

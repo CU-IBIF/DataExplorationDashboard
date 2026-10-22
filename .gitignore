@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+build/
+dist/
+.pytest_cache/
+# local projects / data
+projects/
+*.h5ad
+!examples/*.h5ad
+.featurescope/

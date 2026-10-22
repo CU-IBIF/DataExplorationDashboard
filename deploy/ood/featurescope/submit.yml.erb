@@ -1,0 +1,11 @@
+---
+batch_connect:
+  template: basic
+script:
+  native:
+    - "--cpus-per-task=<%= num_cores %>"
+    - "--mem=<%= memory_gb %>G"
+<% if gpus.to_i > 0 %>
+    - "--partition=gpu"
+    - "--gres=gpu:<%= gpus %>"
+<% end %>

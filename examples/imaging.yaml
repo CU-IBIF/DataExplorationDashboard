@@ -1,0 +1,16 @@
+# Multiplexed imaging / cytometry (IMC, CODEX/PhenoCycler, CyCIF, MIBI, flow/CyTOF)
+# featurescope create proj cells.csv --batch slide && featurescope run proj --pipeline-file examples/imaging.yaml
+name: imaging
+steps:
+  - {op: filter_objects, params: {column: "obs:area", quantile_low: 0.005, quantile_high: 0.995}}
+  - {op: transform, params: {method: arcsinh, cofactor: 150}}
+  - {op: clip, params: {low: 0.001, high: 0.999}}
+  - {op: batch_center, params: {}}
+  - {op: normalize, params: {method: zscore, max_value: 5}}
+  - {op: pca, params: {n_comps: 20}}
+  - {op: harmony, params: {}}
+  - {op: neighbors, params: {use_rep: X_harmony, n_neighbors: 15}}
+  - {op: umap, params: {}}
+  - {op: leiden, params: {resolution: 0.8}}
+  - {op: flowsom, params: {grid: 10, n_meta: 15}}
+  - {op: markers, params: {groupby: leiden}}

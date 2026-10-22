@@ -1,0 +1,13 @@
+---
+cluster: "cluster"          # set to your OnDemand cluster id
+form:
+  - bc_num_hours
+  - num_cores
+  - memory_gb
+  - gpus
+  - workspace
+attributes:
+  num_cores: {widget: number_field, value: 16, min: 1, max: 64}
+  memory_gb: {widget: number_field, value: 64, min: 8, max: 1000, label: "Memory (GB)"}
+  gpus: {widget: select, options: [["None", "0"], ["1 GPU", "1"]], value: "0"}
+  workspace: {widget: text_field, value: "$HOME/featurescope_projects", label: "Workspace directory"}

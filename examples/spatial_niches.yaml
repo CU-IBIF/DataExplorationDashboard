@@ -1,0 +1,16 @@
+# Cell types -> spatial graph -> neighborhood enrichment, cellular neighborhoods, GNN tissue domains
+name: spatial_niches
+steps:
+  - {op: transform, params: {method: arcsinh, cofactor: 150}}
+  - {op: batch_center, params: {}}
+  - {op: normalize, params: {method: zscore, max_value: 5}}
+  - {op: pca, params: {n_comps: 15}}
+  - {op: harmony, params: {}}
+  - {op: neighbors, params: {use_rep: X_harmony}}
+  - {op: leiden, params: {resolution: 0.5}}
+  - {op: spatial_neighbors, params: {method: knn, n_neighbors: 10}}
+  - {op: nhood_enrichment, params: {cluster_key: leiden, n_perms: 200}}
+  - {op: cellular_neighborhoods, params: {cluster_key: leiden, n_neighborhoods: 8}}
+  - {op: spatial_dgi, params: {use_rep: X_harmony, epochs: 300}}       # GPU recommended above ~200k cells
+  - {op: kmeans, params: {use_rep: X_spatial_dgi, n_clusters: 8, key: spatial_domain}}
+  - {op: spatial_autocorr, params: {}}

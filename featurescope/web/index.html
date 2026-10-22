@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FeatureScope</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script src="vendor/plotly.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">FeatureScope</div>
+  <div id="projectLabel" class="muted">no project</div>
+  <div class="spacer"></div>
+  <div class="selbox">
+    <span>Selection mode</span>
+    <select id="selMode" title="How a new lasso/box combines with the current selection">
+      <option value="replace">replace</option><option value="add">add (∪)</option>
+      <option value="intersect">intersect (∩)</option><option value="subtract">subtract (−)</option>
+    </select>
+    <span id="selCount" class="pill">0 selected</span>
+    <button id="selClear" class="ghost">Clear</button>
+  </div>
+  <div id="runStatus" class="runstatus hidden">
+    <div class="bar"><div id="runBar"></div></div><span id="runMsg"></span>
+    <button id="runCancel" class="ghost">Cancel</button>
+  </div>
+  <button id="themeToggle" class="ghost" title="Toggle light/dark">◐</button>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="tabs">
+      <button data-tab="data" class="active">Data</button>
+      <button data-tab="pipeline">Pipeline</button>
+      <button data-tab="gates">Gates</button>
+      <button data-tab="results">Results</button>
+      <button data-tab="compute">Compute</button>
+    </div>
+
+    <!-- DATA -->
+    <section id="tab-data" class="tab active">
+      <h3>Projects</h3>
+      <div id="projectList" class="list"></div>
+      <h3>New project</h3>
+      <label>Name <input id="newName" placeholder="e.g. tonsil_IMC_2026"></label>
+      <label class="file">Upload table (CSV, TSV, Parquet, Feather, .h5ad)
+        <input id="fileInput" type="file" accept=".csv,.tsv,.txt,.parquet,.pq,.feather,.arrow,.h5ad,.gz,.xlsx">
+      </label>
+      <label>…or a path on the server (large files, HPC scratch)
+        <div class="row"><input id="serverPath" placeholder="/scratch/me/cells.parquet"><button id="previewPath">Preview</button></div>
+      </label>
+      <div id="importRoles" class="hidden"></div>
+      <div class="row"><button id="demoBtn" class="ghost">Create demo dataset (synthetic multiplexed imaging)</button></div>
+      <div id="dataInfo"></div>
+    </section>
+
+    <!-- PIPELINE -->
+    <section id="tab-pipeline" class="tab">
+      <div class="row">
+        <select id="pipelineSelect"></select>
+        <button id="loadPipeline" class="ghost">Load</button>
+        <button id="savePipeline" class="ghost">Save as…</button>
+      </div>
+      <div class="row">
+        <select id="templateSelect">
+          <option value="">Start from template…</option>
+          <option value="imaging">Multiplexed imaging / cytometry</option>
+          <option value="transcriptomics">Transcriptomics (counts)</option>
+          <option value="spatial">Spatial niches (graph + deep)</option>
+          <option value="deep">Deep embedding (batch-aware VAE)</option>
+        </select>
+      </div>
+      <div id="steps" class="steps"></div>
+      <div class="row">
+        <select id="addStep"></select>
+        <button id="addStepBtn">Add step</button>
+      </div>
+      <div class="row">
+        <button id="runBtn" class="primary">Run pipeline</button>
+        <button id="forceBtn" class="ghost" title="Ignore cache and recompute everything">Recompute all</button>
+      </div>
+      <p class="hint">Steps already computed are loaded from the cache (●). Changing a step only recomputes it and the steps below it.</p>
+    </section>
+
+    <!-- GATES -->
+    <section id="tab-gates" class="tab">
+      <p class="hint">Draw with lasso/box on any scatter or histogram, then <b>Save gate</b> in that panel. Gates are hierarchical: set a panel's “within gate” to gate inside a parent population.</p>
+      <div id="gateTree" class="list"></div>
+      <h3>Boolean gate</h3>
+      <div class="row"><input id="boolName" placeholder="name"><select id="boolExpr"><option>and</option><option>or</option><option>not</option></select></div>
+      <select id="boolOf" multiple size="4"></select>
+      <button id="boolAdd" class="ghost">Add boolean gate</button>
+      <h3>Annotate selection</h3>
+      <div class="row"><input id="annotCol" value="manual_label" placeholder="column"><input id="annotLabel" placeholder="label, e.g. T cell"></div>
+      <button id="annotBtn" class="ghost">Label selected objects</button>
+    </section>
+
+    <!-- RESULTS -->
+    <section id="tab-results" class="tab">
+      <div id="resultList" class="list"></div>
+      <h3>Export</h3>
+      <div class="row"><input id="exportName" value="results"><button id="exportBtn" class="ghost">Write .h5ad</button></div>
+      <div class="row"><a id="dlTable" href="api/download/table" class="button ghost">Objects CSV</a>
+        <a id="dlSel" href="api/download/table?selection_only=true" class="button ghost">Selection CSV</a>
+        <a href="api/download/pipeline" class="button ghost">Pipeline JSON</a></div>
+      <div id="exportMsg" class="hint"></div>
+    </section>
+
+    <!-- COMPUTE -->
+    <section id="tab-compute" class="tab">
+      <div id="recommend" class="card"></div>
+      <h3>Run current pipeline remotely</h3>
+      <select id="profileSelect"></select>
+      <div id="profileInfo" class="hint"></div>
+      <label class="check"><input id="dryRun" type="checkbox" checked> Dry run (write scripts, show commands, don't submit)</label>
+      <button id="submitRemote" class="primary">Submit</button>
+      <h3>Jobs</h3>
+      <div id="jobList" class="list"></div>
+      <p class="hint">Profiles live in <code>~/.featurescope/compute.yaml</code> or <code>&lt;project&gt;/compute.yaml</code>. See <code>docs/COMPUTE_STRATEGY.md</code>.</p>
+    </section>
+  </nav>
+
+  <main>
+    <div class="toolbar">
+      <span class="muted">Add view:</span>
+      <button data-add="scatter">Scatter / embedding</button>
+      <button data-add="spatial">Spatial</button>
+      <button data-add="hist">Histogram</button>
+      <button data-add="groups">Feature by group</button>
+      <button data-add="heatmap">Group heatmap</button>
+      <button data-add="markers">Selection vs rest</button>
+    </div>
+    <div id="panels" class="panels"></div>
+    <div id="empty" class="empty">
+      <h2>Explore object × feature data</h2>
+      <p>Open or create a project on the left. Rows are objects (cells, nuclei, organelles…), columns are features.
+        Build a pipeline, then lasso any view: the selection highlights in every view.</p>
+    </div>
+  </main>
+</div>
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>

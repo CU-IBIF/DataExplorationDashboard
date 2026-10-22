@@ -1,0 +1,8 @@
+---
+name: FeatureScope
+category: Interactive Apps
+subcategory: Servers
+role: batch_connect
+description: |
+  Interactive exploration of object-by-feature data (imaging, cytometry, transcriptomics)
+  on a compute node, with optional GPU.

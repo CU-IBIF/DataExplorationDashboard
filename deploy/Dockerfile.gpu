@@ -1,0 +1,14 @@
+# GPU image: CUDA PyTorch (deep embeddings) + RAPIDS / rapids-singlecell (GPU PCA, kNN, UMAP, Leiden).
+#   docker build -f deploy/Dockerfile.gpu -t featurescope:gpu .
+# Pick the RAPIDS tag that matches the cluster's NVIDIA driver (CUDA 12.x drivers >= 525).
+FROM rapidsai/base:24.12-cuda12.5-py3.12
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends rsync openssh-client awscli \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt/featurescope
+COPY pyproject.toml README.md ./
+COPY featurescope ./featurescope
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu124 \
+    && pip install --no-cache-dir rapids-singlecell ".[batch]"
+ENV NUMBA_CACHE_DIR=/tmp/numba MPLCONFIGDIR=/tmp/mpl
+CMD ["featurescope", "serve", "--host", "0.0.0.0", "--workspace", "/data"]
