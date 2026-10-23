@@ -15,7 +15,7 @@ def _profiles(root):
                 "storage": "s3://bucket/fs", "s3_endpoint": "https://s3.example.org"},
         "aws": {"type": "aws_batch", "job_queue": "q", "job_definition": "d", "storage": "s3://b/fs", "gpus": 1},
         "gcp": {"type": "gcp_batch", "image": "img", "storage": "gs://b/fs"},
-    }}))
+    }}), encoding="utf-8")
 
 
 def test_dry_run_all_backends(project):
@@ -26,20 +26,20 @@ def test_dry_run_all_backends(project):
         ex = cx.get_executor(name, project.root, dry_run=True)
         job = ex.submit(pl.to_dict())
         assert job.status == "submitted"
-        log = (job.path(project.root) / "commands.log").read_text()
+        log = (job.path(project.root) / "commands.log").read_text(encoding="utf-8")
         assert log.strip()
         if name == "hpc":
-            script = (job.path(project.root) / "job.sbatch").read_text()
+            script = (job.path(project.root) / "job.sbatch").read_text(encoding="utf-8")
             assert "#SBATCH --gres=gpu:1" in script and "apptainer exec --nv" in script
             assert "featurescope run" in script and "rsync" in log and "sbatch --parsable" in log
         if name == "nrp":
-            manifest = yaml.safe_load((job.path(project.root) / "job.yaml").read_text())
+            manifest = yaml.safe_load((job.path(project.root) / "job.yaml").read_text(encoding="utf-8"))
             c = manifest["spec"]["template"]["spec"]["containers"][0]
             assert c["resources"]["limits"]["nvidia.com/gpu"] == "1"
             assert "featurescope run" in c["args"][0] and "--endpoint-url" in c["args"][0]
         assert ex.status(job) == "COMPLETED"
     jobs = cx.Job.list(project.root)
-    assert len(jobs) == 4 and json.loads((jobs[0].path(project.root) / "pipeline.json").read_text())["name"] == "p"
+    assert len(jobs) == 4 and json.loads((jobs[0].path(project.root) / "pipeline.json").read_text(encoding="utf-8"))["name"] == "p"
 
 
 def test_recommend():

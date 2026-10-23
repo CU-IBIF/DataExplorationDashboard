@@ -5,6 +5,9 @@ on:
     branches: ["**"]
   pull_request:
 
+env:
+  PYTHONUTF8: "1"
+
 jobs:
   test:
     strategy:
@@ -27,4 +30,7 @@ jobs:
           if [ "$RUNNER_OS" = "macOS" ]; then pip install --only-binary=:all: torch
           else pip install --only-binary=:all: torch --index-url https://download.pytorch.org/whl/cpu; fi
           pip install --only-binary=:all: -e ".[dev]"
-      - run: pytest -q -p no:warnings
+      - run: pytest -q -p no:warnings --junitxml=junit.xml
+      - name: Report failures as annotations
+        if: failure()
+        run: python .github/scripts/annotate.py junit junit.xml

@@ -89,7 +89,7 @@ class Delta:
         if self.uns:
             with open(tmp / "uns.pkl", "wb") as fh:
                 pickle.dump(self.uns, fh, protocol=pickle.HIGHEST_PROTOCOL)
-        (tmp / "delta.json").write_text(json.dumps(manifest, indent=1))
+        (tmp / "delta.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
         if path.exists():
             import shutil
             shutil.rmtree(path)
@@ -98,7 +98,7 @@ class Delta:
     @classmethod
     def load(cls, path: str | Path) -> "Delta":
         path = Path(path)
-        manifest = json.loads((path / "delta.json").read_text())
+        manifest = json.loads((path / "delta.json").read_text(encoding="utf-8"))
         arrays = {}
         for k, fname in manifest.get("arrays", {}).items():
             f = path / fname

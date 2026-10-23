@@ -41,7 +41,7 @@ def load_profiles(project_root: str | Path | None = None) -> dict:
         paths.append(Path(project_root) / "compute.yaml")
     for p in paths:
         if p.exists():
-            profiles.update((yaml.safe_load(p.read_text()) or {}).get("profiles", {}))
+            profiles.update((yaml.safe_load(p.read_text(encoding="utf-8")) or {}).get("profiles", {}))
     return profiles
 
 
@@ -65,18 +65,18 @@ class Job:
     def save(self, project_root: Path) -> None:
         d = self.path(project_root)
         d.mkdir(parents=True, exist_ok=True)
-        (d / "job.json").write_text(json.dumps(asdict(self), indent=1))
+        (d / "job.json").write_text(json.dumps(asdict(self), indent=1), encoding="utf-8")
 
     @classmethod
     def load(cls, project_root: Path, job_id: str) -> "Job":
-        return cls(**json.loads((Path(project_root) / "jobs" / job_id / "job.json").read_text()))
+        return cls(**json.loads((Path(project_root) / "jobs" / job_id / "job.json").read_text(encoding="utf-8")))
 
     @classmethod
     def list(cls, project_root: Path) -> list["Job"]:
         out = []
         for p in sorted((Path(project_root) / "jobs").glob("*/job.json")):
             try:
-                out.append(cls(**json.loads(p.read_text())))
+                out.append(cls(**json.loads(p.read_text(encoding="utf-8"))))
             except Exception:
                 pass
         return sorted(out, key=lambda j: j.created, reverse=True)
@@ -95,13 +95,13 @@ class Runner:
         self.commands.append(cmd)
         line = " ".join(shlex.quote(c) for c in cmd)
         if self.log_file:
-            with open(self.log_file, "a") as fh:
+            with open(self.log_file, "a", encoding="utf-8") as fh:
                 fh.write(f"$ {line}\n")
         if self.dry_run:
             return ""
         r = subprocess.run(cmd, input=input, capture_output=True, text=True, timeout=timeout)
         if self.log_file:
-            with open(self.log_file, "a") as fh:
+            with open(self.log_file, "a", encoding="utf-8") as fh:
                 fh.write(r.stdout + r.stderr)
         if check and r.returncode != 0:
             raise RuntimeError(f"command failed ({r.returncode}): {line}\n{r.stderr.strip()[-2000:]}")
@@ -109,7 +109,7 @@ class Runner:
 
 
 def _render(template: str, **values) -> str:
-    return Template((TEMPLATES / template).read_text()).safe_substitute(**values)
+    return Template((TEMPLATES / template).read_text(encoding="utf-8")).safe_substitute(**values)
 
 
 def _run_cmd(remote_project: str, pipeline_file: str, prof: dict) -> str:
@@ -132,7 +132,7 @@ class Executor:
         job = Job(id=time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:4], profile=self.name,
                   pipeline=pipeline["name"], dry_run=self.dry_run)
         job.path(self.root).mkdir(parents=True, exist_ok=True)
-        (job.path(self.root) / "pipeline.json").write_text(json.dumps(pipeline, indent=1))
+        (job.path(self.root) / "pipeline.json").write_text(json.dumps(pipeline, indent=1), encoding="utf-8")
         return job
 
     def submit(self, pipeline: dict) -> Job:
@@ -163,7 +163,7 @@ class SlurmExecutor(Executor):
         return f"{p['user']}@{p['host']}" if p.get("user") else p["host"]
 
     def remote_project(self) -> str:
-        meta = json.loads((self.root / "project.json").read_text())
+        meta = json.loads((self.root / "project.json").read_text(encoding="utf-8"))
         root = self.prof.get("remote_root", "~/featurescope").replace("{user}", self.prof.get("user", "$USER"))
         return f"{root.rstrip('/')}/{meta['base_key']}"   # same data -> same remote dir, uploads are incremental
 
@@ -185,7 +185,7 @@ class SlurmExecutor(Executor):
                          extra_sbatch="\n".join(f"#SBATCH {x}" for x in p.get("sbatch_extra", [])),
                          workdir=f"{rp}/jobs/{job.id}", env_setup=p.get("env_setup", ""),
                          run_cmd=self._wrap(_run_cmd(rp, f"{rp}/jobs/{job.id}/pipeline.json", p)))
-        (job.path(self.root) / "job.sbatch").write_text(script)
+        (job.path(self.root) / "job.sbatch").write_text(script, encoding="utf-8")
         run(["rsync", "-az", "-e", rsh, str(job.path(self.root) / "pipeline.json"),
              str(job.path(self.root) / "job.sbatch"), f"{self._target()}:{rp}/jobs/{job.id}/"])
         out = run([*self._ssh(), f"cd {rp}/jobs/{job.id} && sbatch --parsable job.sbatch"])
@@ -227,7 +227,7 @@ class _ObjectStoreMixin:
     """Stage through S3-compatible storage (AWS S3, NRP Ceph S3, MinIO) or GCS."""
 
     def store_uri(self) -> str:
-        meta = json.loads((self.root / "project.json").read_text())
+        meta = json.loads((self.root / "project.json").read_text(encoding="utf-8"))
         return f"{self.prof['storage'].rstrip('/')}/{meta['base_key']}"
 
     def _sync_cmd(self, src: str, dst: str) -> list[str]:
@@ -298,7 +298,7 @@ class KubernetesExecutor(_ObjectStoreMixin, Executor):
                            secret=p.get("s3_secret", "s3-credentials"),
                            script=json.dumps(self.container_script(uri, job)),
                            node_selector=json.dumps(p.get("node_selector", {})))
-        (job.path(self.root) / "job.yaml").write_text(manifest)
+        (job.path(self.root) / "job.yaml").write_text(manifest, encoding="utf-8")
         run([*self._kubectl(), "apply", "-f", str(job.path(self.root) / "job.yaml")])
         job.remote_id, job.status = name, "submitted"
         job.log(f"submitted k8s job {name} in namespace {p['namespace']}")
@@ -376,7 +376,7 @@ class GcpBatchExecutor(_ObjectStoreMixin, Executor):
                        if p.get("gpus") else {})}}]},
                 "logsPolicy": {"destination": "CLOUD_LOGGING"}}
         f = job.path(self.root) / "gcp-batch.json"
-        f.write_text(json.dumps(spec, indent=1))
+        f.write_text(json.dumps(spec, indent=1), encoding="utf-8")
         name = f"featurescope-{job.id}".lower()
         run(["gcloud", "batch", "jobs", "submit", name, "--location", p.get("region", "us-central1"), "--config", str(f)])
         job.remote_id, job.status = name, "submitted"

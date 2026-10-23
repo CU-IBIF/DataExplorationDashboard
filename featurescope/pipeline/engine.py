@@ -12,6 +12,7 @@ import hashlib
 import json
 import logging
 import os
+import platform
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -104,11 +105,11 @@ class Cache:
 
     def put(self, key: str, delta: Delta, meta: dict) -> None:
         delta.save(self.path(key))
-        (self.path(key) / "meta.json").write_text(json.dumps(meta, indent=1, default=str))
+        (self.path(key) / "meta.json").write_text(json.dumps(meta, indent=1, default=str), encoding="utf-8")
 
     def meta(self, key: str) -> dict:
         p = self.path(key) / "meta.json"
-        return json.loads(p.read_text()) if p.exists() else {}
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
 
     def size_bytes(self) -> int:
         return sum(f.stat().st_size for f in self.root.rglob("*") if f.is_file())
@@ -158,7 +159,7 @@ def run(pipeline: Pipeline, adata: ad.AnnData, base_key: str, cache: Cache | Non
                 status = "computed"
                 if cache is not None:
                     cache.put(k, delta, {"op": s.op, "params": info.resolve(s.params), "seconds": time.time() - t0,
-                                         "n_obs": adata.n_obs, "n_vars": adata.n_vars, "host": os.uname().nodename,
+                                         "n_obs": adata.n_obs, "n_vars": adata.n_vars, "host": platform.node(),
                                          "time": time.strftime("%Y-%m-%d %H:%M:%S"), "log": delta.log})
             adata = delta.apply(adata)
             done += 1

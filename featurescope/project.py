@@ -42,7 +42,7 @@ class Project:
         meta = self.root / "project.json"
         if not meta.exists():
             raise FileNotFoundError(f"{self.root} is not a FeatureScope project (no project.json)")
-        self.meta = json.loads(meta.read_text())
+        self.meta = json.loads(meta.read_text(encoding="utf-8"))
         self.cache = engine.Cache(self.root / "cache")
         self._base: ad.AnnData | None = None
 
@@ -62,9 +62,9 @@ class Project:
                 "source": str(source) if not isinstance(source, ad.AnnData) else "AnnData",
                 "batch_key": adata.uns.get("batch_key"), "has_spatial": "spatial" in adata.obsm,
                 "format": 1}
-        (root / "project.json").write_text(json.dumps(meta, indent=2))
+        (root / "project.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
         if not (root / "gates.json").exists():
-            (root / "gates.json").write_text("{}")
+            (root / "gates.json").write_text("{}", encoding="utf-8")
         return cls(root)
 
     # ----------------------------------------------------------------- data
@@ -78,16 +78,16 @@ class Project:
         return self._base
 
     def save_meta(self) -> None:
-        (self.root / "project.json").write_text(json.dumps(self.meta, indent=2))
+        (self.root / "project.json").write_text(json.dumps(self.meta, indent=2), encoding="utf-8")
 
     # ----------------------------------------------------------------- gates
     def gates(self) -> dict:
         p = self.root / "gates.json"
-        return json.loads(p.read_text()) if p.exists() else {}
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
 
     def save_gates(self, gates: dict) -> None:
         tmp = self.root / "gates.json.tmp"
-        tmp.write_text(json.dumps(gates, indent=1))
+        tmp.write_text(json.dumps(gates, indent=1), encoding="utf-8")
         tmp.replace(self.root / "gates.json")
 
     # ----------------------------------------------------------------- manual annotations

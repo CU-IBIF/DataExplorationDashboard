@@ -23,6 +23,11 @@ def _user_dirs() -> tuple[Path, Path]:
 
 def main() -> int:
     multiprocessing.freeze_support()   # required for joblib/loky workers in a frozen app
+    for stream in (sys.stdout, sys.stderr):   # Windows consoles/redirects default to a legacy code page
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     workspace, cache = _user_dirs()
     cache.mkdir(parents=True, exist_ok=True)
     # numba (UMAP / pynndescent) writes its JIT cache next to modules unless told otherwise;

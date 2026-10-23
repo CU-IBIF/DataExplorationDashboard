@@ -45,14 +45,14 @@ class Pipeline:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.suffix in (".yaml", ".yml"):
-            path.write_text(yaml.safe_dump(self.to_dict(), sort_keys=False))
+            path.write_text(yaml.safe_dump(self.to_dict(), sort_keys=False), encoding="utf-8")
         else:
-            path.write_text(json.dumps(self.to_dict(), indent=2))
+            path.write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
         return path
 
     @classmethod
     def load(cls, path: str | Path) -> "Pipeline":
         path = Path(path)
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         d = yaml.safe_load(text) if path.suffix in (".yaml", ".yml") else json.loads(text)
         return cls.from_dict(d)

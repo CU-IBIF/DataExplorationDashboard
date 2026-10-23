@@ -19,6 +19,9 @@ concurrency:
   group: windows-build-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PYTHONUTF8: "1"
+
 jobs:
   build:
     runs-on: windows-latest
@@ -48,13 +51,28 @@ jobs:
           pip install --only-binary=:all: . pyinstaller
 
       - name: Self-test the Python install
-        run: featurescope selftest
+        shell: pwsh
+        run: |
+          cmd /c "featurescope selftest > selftest-python.log 2>&1"
+          $code = $LASTEXITCODE
+          Get-Content selftest-python.log -Tail 200
+          if ($code -ne 0) { python .github/scripts/annotate.py log selftest-python.log "selftest (python)"; exit 1 }
 
       - name: Build FeatureScope.exe (PyInstaller)
-        run: pyinstaller packaging/featurescope.spec --noconfirm --clean
+        shell: pwsh
+        run: |
+          cmd /c "pyinstaller packaging\featurescope.spec --noconfirm --clean > pyinstaller.log 2>&1"
+          $code = $LASTEXITCODE
+          Get-Content pyinstaller.log -Tail 200
+          if ($code -ne 0) { python .github/scripts/annotate.py log pyinstaller.log "pyinstaller"; exit 1 }
 
       - name: Self-test the frozen app
-        run: .\dist\FeatureScope\FeatureScope.exe selftest
+        shell: pwsh
+        run: |
+          cmd /c ".\dist\FeatureScope\FeatureScope.exe selftest > selftest-exe.log 2>&1"
+          $code = $LASTEXITCODE
+          Get-Content selftest-exe.log -Tail 200
+          if ($code -ne 0) { python .github/scripts/annotate.py log selftest-exe.log "selftest (FeatureScope.exe)"; exit 1 }
 
       - name: Portable zip
         shell: pwsh
