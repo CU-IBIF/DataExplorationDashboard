@@ -42,11 +42,28 @@ are features.
   Apptainer templates. See **[docs/COMPUTE_STRATEGY.md](docs/COMPUTE_STRATEGY.md)**,
   which includes the options available to Creighton faculty and staff.
 
-## Quick start
+## Windows app (no Python needed)
+
+Download **FeatureScope-Setup-<version>.exe** (installer) or the portable zip from the
+repository's **Releases** page. Builds for any branch are also on the **Actions** tab →
+*Build Windows app* → the run's *Artifacts*. Run it, and the dashboard opens in your
+browser. Projects are stored in `Documents\FeatureScope`. Close the console window to
+stop the dashboard.
+
+The same executable works as the command-line tool, for example
+`FeatureScope.exe run <project> --pipeline imaging`, or `FeatureScope.exe selftest` to
+check an installation.
+
+To publish a release, run `git tag v0.1.1 && git push --tags`. The
+[`build-windows`](.github/workflows/build-windows.yml) workflow builds the app with
+PyInstaller, self-tests the frozen `.exe`, wraps it with Inno Setup, and attaches both
+files to the release. Builds can also be started from the Actions tab (*Run workflow*).
+
+## Quick start (Python)
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-pip install -e ".[deep,batch]"          # torch + harmonypy; drop [deep] for a lighter install
+pip install -e ".[deep]"                # PyTorch for deep embeddings; drop [deep] for a lighter install
 featurescope serve --workspace projects  # http://127.0.0.1:8765
 ```
 
@@ -105,7 +122,7 @@ Key design choices for large data:
 ## Tests
 
 ```bash
-pip install -e ".[dev,deep,batch]" && pytest
+pip install -e ".[dev,deep]" && pytest
 ```
 
 The tests cover import and role detection, delta round-trips, cache hits and partial

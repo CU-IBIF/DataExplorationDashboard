@@ -1,0 +1,94 @@
+name: Build Windows app
+
+# Produces FeatureScope.exe (portable zip) and FeatureScope-Setup-<version>.exe.
+# - every push / pull request: build + self-test, files attached to the run as artifacts
+# - tag v*  (e.g. git tag v0.1.0 && git push --tags): also published as a GitHub Release
+# - "Run workflow" button on the Actions tab (workflow_dispatch)
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+    paths-ignore: ["docs/**", "**.md"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed only to publish releases on tags
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Version
+        id: ver
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") { $v = "${{ github.ref_name }}".TrimStart("v") }
+          else { $v = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Building FeatureScope $v"
+
+      - name: Install dependencies (prebuilt wheels only - no compiler needed)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --only-binary=:all: torch --index-url https://download.pytorch.org/whl/cpu
+          pip install --only-binary=:all: . pyinstaller
+
+      - name: Self-test the Python install
+        run: featurescope selftest
+
+      - name: Build FeatureScope.exe (PyInstaller)
+        run: pyinstaller packaging/featurescope.spec --noconfirm --clean
+
+      - name: Self-test the frozen app
+        run: .\dist\FeatureScope\FeatureScope.exe selftest
+
+      - name: Portable zip
+        shell: pwsh
+        run: Compress-Archive -Path dist\FeatureScope -DestinationPath "dist\FeatureScope-${{ steps.ver.outputs.version }}-windows-portable.zip"
+
+      - name: Installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = Get-Command iscc -ErrorAction SilentlyContinue
+          if (-not $iscc) {
+            $guess = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+            if (-not (Test-Path $guess)) { choco install innosetup -y --no-progress | Out-Null }
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          } else { $iscc = $iscc.Source }
+          & $iscc "/DAppVersion=${{ steps.ver.outputs.version }}" packaging\installer.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FeatureScope-Setup-${{ steps.ver.outputs.version }}
+          path: dist/FeatureScope-Setup-*.exe
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FeatureScope-${{ steps.ver.outputs.version }}-windows-portable
+          path: dist/FeatureScope-*-windows-portable.zip
+          if-no-files-found: error
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/FeatureScope-Setup-*.exe
+            dist/FeatureScope-*-windows-portable.zip
+          generate_release_notes: true

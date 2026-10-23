@@ -18,6 +18,10 @@ def main(argv=None):
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8765)
     s.add_argument("--root-path", default="", help="URL prefix when behind a proxy (Open OnDemand)")
+    s.add_argument("--open", action="store_true", help="open the dashboard in the default browser")
+
+    t = sub.add_parser("selftest", help="end-to-end check of this installation (pipeline + web server)")
+    t.add_argument("--keep", help="directory to keep the test project in")
 
     r = sub.add_parser("run", help="run a pipeline on a project (used on cluster/cloud nodes)")
     r.add_argument("project")
@@ -57,8 +61,19 @@ def main(argv=None):
     if a.cmd == "serve":
         import uvicorn
         from .server.app import create_app
-        print(f"FeatureScope on http://{a.host}:{a.port}{a.root_path}/  (workspace: {Path(a.workspace).resolve()})")
-        uvicorn.run(create_app(a.workspace), host=a.host, port=a.port, root_path=a.root_path, log_level="warning")
+        url = f"http://{'127.0.0.1' if a.host in ('0.0.0.0', '::') else a.host}:{a.port}{a.root_path}/"
+        print(f"FeatureScope on {url}  (workspace: {Path(a.workspace).resolve()})")
+        if a.open:
+            import threading
+            import webbrowser
+            threading.Timer(1.5, webbrowser.open, args=(url,)).start()
+        # pure-Python asyncio/h11 stack: identical on every OS and inside the frozen .exe
+        uvicorn.run(create_app(a.workspace), host=a.host, port=a.port, root_path=a.root_path, log_level="warning",
+                    loop="asyncio", http="h11")
+
+    elif a.cmd == "selftest":
+        from .selftest import run
+        return run(a.keep)
 
     elif a.cmd == "create":
         from .project import Project

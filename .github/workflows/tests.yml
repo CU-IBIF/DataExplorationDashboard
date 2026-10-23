@@ -1,0 +1,30 @@
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install (prebuilt wheels only; proves no compiler is needed)
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          if [ "$RUNNER_OS" = "macOS" ]; then pip install --only-binary=:all: torch
+          else pip install --only-binary=:all: torch --index-url https://download.pytorch.org/whl/cpu; fi
+          pip install --only-binary=:all: -e ".[dev]"
+      - run: pytest -q -p no:warnings

@@ -9,7 +9,7 @@ WORKDIR /opt/featurescope
 COPY pyproject.toml README.md ./
 COPY featurescope ./featurescope
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir ".[batch]"
+    && pip install --no-cache-dir .
 ENV NUMBA_CACHE_DIR=/tmp/numba MPLCONFIGDIR=/tmp/mpl
 EXPOSE 8765
 CMD ["featurescope", "serve", "--host", "0.0.0.0", "--workspace", "/data"]

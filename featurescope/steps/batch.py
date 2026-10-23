@@ -37,20 +37,26 @@ def combat(adata, ctx, batch_key, covariates):
     P("basis", "str", "X_pca", help="Embedding to correct (run PCA first)"),
     P("theta", "float", 2.0, help="Diversity penalty"),
     P("max_iter", "int", 20),
-], requires=["harmonypy"])
-def harmony(adata, ctx, batch_key, basis, theta, max_iter):
+    P("implementation", "choice", "builtin", choices=["builtin", "harmonypy"],
+      help="builtin = pure NumPy, same result on every machine; harmonypy needs that package installed"),
+])
+def harmony(adata, ctx, batch_key, basis, theta, max_iter, implementation):
     """Iterative soft-clustering integration of an embedding (Korsunsky et al. 2019). Writes X_harmony."""
-    import harmonypy
     key = _batch_key(adata, batch_key)
     if basis not in adata.obsm:
         raise ValueError(f"{basis} not found; add a PCA step before Harmony")
     Z = np.asarray(adata.obsm[basis], np.float64)
-    ho = harmonypy.run_harmony(Z, adata.obs[[key]], [key], theta=theta, max_iter_harmony=max_iter,
-                               random_state=ctx.seed, verbose=False)
-    Zc = np.asarray(ho.Z_corr)
-    if Zc.shape[0] != Z.shape[0]:   # harmonypy < 0.1 returns (dims x cells)
-        Zc = Zc.T
-    return Delta(obsm={"X_harmony": Zc.astype(np.float32)}, log=f"Harmony over '{key}'")
+    if implementation == "harmonypy":
+        import harmonypy
+        ho = harmonypy.run_harmony(Z, adata.obs[[key]], [key], theta=theta, max_iter_harmony=max_iter,
+                                   random_state=ctx.seed, verbose=False)
+        Zc = np.asarray(ho.Z_corr)
+        if Zc.shape[0] != Z.shape[0]:   # harmonypy < 0.1 returns (dims x cells)
+            Zc = Zc.T
+    else:
+        from ._harmony import run_harmony
+        Zc = run_harmony(Z, adata.obs[key].to_numpy(), theta=theta, max_iter=max_iter, seed=ctx.seed)
+    return Delta(obsm={"X_harmony": Zc.astype(np.float32)}, log=f"Harmony ({implementation}) over '{key}'")
 
 
 @op("batch_center", "Batch correction", "Per-batch centering/scaling", params=[
