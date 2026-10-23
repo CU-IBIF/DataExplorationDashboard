@@ -78,28 +78,31 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path dist\FeatureScope -DestinationPath "dist\FeatureScope-${{ steps.ver.outputs.version }}-windows-portable.zip"
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FeatureScope-${{ steps.ver.outputs.version }}-windows-portable
+          path: dist/FeatureScope-*-windows-portable.zip
+          if-no-files-found: error
+
       - name: Installer (Inno Setup)
         shell: pwsh
         run: |
-          $iscc = Get-Command iscc -ErrorAction SilentlyContinue
-          if (-not $iscc) {
-            $guess = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-            if (-not (Test-Path $guess)) { choco install innosetup -y --no-progress | Out-Null }
-            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          } else { $iscc = $iscc.Source }
-          & $iscc "/DAppVersion=${{ steps.ver.outputs.version }}" packaging\installer.iss
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $found = Get-Command iscc -ErrorAction SilentlyContinue
+            if ($found) { $iscc = $found.Source }
+            else { choco install innosetup -y --no-progress | Out-Null }
+          }
+          Write-Host "Using $iscc"
+          cmd /c "`"$iscc`" /DAppVersion=${{ steps.ver.outputs.version }} packaging\installer.iss > inno.log 2>&1"
+          $code = $LASTEXITCODE
+          Get-Content inno.log -Tail 60
+          if ($code -ne 0) { python .github/scripts/annotate.py log inno.log "Inno Setup"; exit 1 }
 
       - uses: actions/upload-artifact@v4
         with:
           name: FeatureScope-Setup-${{ steps.ver.outputs.version }}
           path: dist/FeatureScope-Setup-*.exe
-          if-no-files-found: error
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: FeatureScope-${{ steps.ver.outputs.version }}-windows-portable
-          path: dist/FeatureScope-*-windows-portable.zip
           if-no-files-found: error
 
       - name: Publish release

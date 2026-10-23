@@ -21,9 +21,8 @@ SetupIconFile=featurescope.ico
 UninstallDisplayIcon={app}\FeatureScope.exe
 Compression=lzma2/ultra64
 SolidCompression=yes
-LZMANumBlockThreads=4
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed=x64
+ArchitecturesInstallIn64BitMode=x64
 WizardStyle=modern
 DisableProgramGroupPage=yes
 
